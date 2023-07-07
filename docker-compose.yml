@@ -1,0 +1,55 @@
+# liste des différents conteneurs
+services:
+  # conteneur pour mongodb
+  mongodb:
+    # image mongo
+    image: mongo
+    container_name: mongodb
+    restart: always
+    # ouverture du port mongo
+    ports:
+      - 27017:27017
+    # volume pour persister mes données
+    volumes:
+      - "./data/db:/data/db"
+    # deploiement dans un réseau
+    networks:
+      - app-mongo-VNet
+
+  # conteneur de mon conteneur
+  mongo-express:
+    # image de mon conteneur
+    image: mongo-express
+    restart: always
+    # ouverture du port de l'ui
+    ports:
+      - 8081:8081
+    environment:
+      # Nom du service de la BDD
+      ME_CONFIG_MONGODB_SERVER: mongodb
+    depends_on:
+      - mongodb
+    networks:
+      - app-mongo-VNet
+
+  # conteneur de mon application flask
+  crudapp:
+    #construire à la volée mon image
+    build: .
+    # ouverture des ports du conteneur de l'app python
+    ports:
+      - 9002:9001
+    networks:
+      - app-mongo-VNet
+    depends_on:
+      - mongodb
+    # ajout d'une variable pour récupérer l'ip du conteneur mongodb
+    # en fesant réference au nom du service
+    environment:
+      - MONGO_HOST=mongodb
+
+
+# fabrication du réseau app-mongo-VNet
+networks:
+  app-mongo-VNet:
+    driver: bridge

@@ -1,52 +1,91 @@
-from flask import Flask, request, jsonify
+# import de mes librairies
+
+from flask import Flask, jsonify, request
 from pymongo import MongoClient
 import os
+from bson.objectid import ObjectId
 
 
+# creation de mon application flask
 app = Flask(__name__)
 
-# mongo db host
-host = os.environ.get('MONGO_HOST', "localhost")
+# information de connexion à la base de données
+host = os.environ.get("MONGO_HOST", "localhost")
 port = 27017
 
-# connexion à la base de données
+# creation du client de connexion
 client = MongoClient(host=host, port=port)
 
-#récupération de ma base de données
+# recuperation de ma base de données
 mabdd = client.demo
 
 
-# route test
-@app.route('/', methods=['GET'])
+# recuperation de ma collection
+col = mabdd.users
+
+# premiere route sur "/"
+@app.route("/")
 def hello_world():
-    return 'Hello World! \n' + str(type(mabdd)) + '\n mabdd : \n' + str(mabdd)
+    informations = {
+    "Hello": "World!",
+    "mabdd_type" :str(type(mabdd)),
+    "mabdd" : str(mabdd)
+    }
 
-# affiche tous les users
-@app.route('/users', methods=['GET'])
+    return jsonify({"BDD":informations})
+
+
+# test flask 123
+@app.route("/test123/<msg>", methods=["GET"])
+def test123(msg):
+    return f'bonjour {msg}'
+
+
+# methode read all
+@app.route("/users", methods=["GET"])
 def get_users():
-    return 'Tous les users'
+    datas = list(col.find())
+    for data in datas:
+        data["_id"] = str(data["_id"])
+    return jsonify({"users": datas})
 
-# find by id
-@app.route('/users/<id>', methods=['GET'])
+
+# methode find by id
+@app.route("/users/<id>", methods=["GET"])
 def get_user(id):
-    return f'Le user qui a l\'id : {id}'
+    data = col.find_one({'_id': ObjectId(id)})
+    data["_id"] = str(data["_id"])
+    return jsonify({"user": data})
 
-# create user
-@app.route('/users/<id>', methods=['POST'])
-def create_user(id):
-    return None
 
-# maj user
-@app.route('/users', methods=['PUT'])
-def update_user():
-    return None
+# methode pour creer un user
+@app.route("/users", methods=["POST"])
+def create_user():
+    data = request.get_json()
+    result = col.insert_one(data)
+    data["_id"] = str(result.inserted_id)
+    return jsonify({"new_user": data})
 
-# suppr user
-@app.route('/users/<id>', methods=['DELETE'])
+
+# methode pour mettre à jour un user
+@app.route("/users/<id>", methods=["PUT"])
+def update_user(id):
+    data = request.get_json()
+    data["_id"] = ObjectId(id)
+    result = col.replace_one({'_id': ObjectId(id)}, data)
+    data["_id"] = str(result.upserted_id)
+    return jsonify({"update_user": data})
+
+
+# methode pour supprimer un user
+@app.route("/users/<id>", methods=["DELETE"])
 def delete_user(id):
-    return None
+    data_delete = col.find_one({'_id': ObjectId(id)})
+    data_delete["_id"] = str(data_delete["_id"])
+    col.delete_one({'_id': ObjectId(id)})
+    return jsonify({"delete_user": data_delete})
 
 
-
-if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=9001, debug=True)
+# lancement de mon application
+if __name__ == "__main__":
+    app.run(host="0.0.0.0",port=9001, debug=True)
